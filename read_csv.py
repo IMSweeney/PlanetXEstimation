@@ -53,9 +53,18 @@ def read_ephemeris(location, name):
 
 if __name__ == '__main__':
     df = pd.read_csv('TNO_parameters.txt')
-    print(df.head())
 
+    eph_data = {}
     data_location = 'data'
-    VP113_dat = read_ephemeris(data_location, 'VP113')
-    print(VP113_dat)
+    for i, row in df.iterrows():
+        obj_name = row['Object']
+        if obj_name in ['Planet_X_(6)', 'Planet_X_(12)']:
+            continue
+        dat = read_ephemeris(data_location, obj_name)
+        dat = pd.DataFrame(dat)
+        eph_data[obj_name] = dat
+        print(dat.head())
+        exit()
+
+
 pass
