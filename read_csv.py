@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import re
 
+import matplotlib.pyplot as plt
+
 
 def read_ephemeris(location, name):
     '''
@@ -56,7 +58,8 @@ if __name__ == '__main__':
     ##
     # Meta_data (masses)
     df = pd.read_csv('TNO_parameters.txt')
-    df = df.rename(columns={' Mass(kg)': 'Mass(kg)', ' h(m*2/sec)': 'h(m*2/sec)'})
+    df = df.rename(columns={
+        ' Mass(kg)': 'Mass(kg)', ' h(m*2/sec)': 'h(m*2/sec)'})
     masses = df.to_dict(orient='records')
     M_sun = 1.989e30  # kg
     M_px = 5.388e25  # kg
@@ -84,7 +87,8 @@ if __name__ == '__main__':
     #   - r_si is the range vector of satelite i w.r.t the Sun
 
     dat_p_x = list(eph_data.values())[0]['time'].to_frame()
-    dat_p_x['sum_mi_ri'] = dat_p_x.apply(lambda x: np.array([0, 0, 0]), axis=1)
+    dat_p_x['sum_mi_ri'] = dat_p_x.apply(
+        lambda x: np.array([0, 0, 0]), axis=1)
 
     for i, row in df.iterrows():
         obj_name = row['Object']
@@ -92,11 +96,22 @@ if __name__ == '__main__':
         if obj_name in ['Planet_X_(6)', 'Planet_X_(12)']:
             continue
         dat = eph_data[obj_name]
-        dat['r_i'] = dat.apply(lambda x: np.array([x['X'], x['Y'], x['Z']]), axis=1)
-        dat['v_i'] = dat.apply(lambda x: np.array([x['VX'], x['VY'], x['VZ']]), axis=1)
+        dat['r_i'] = dat.apply(
+            lambda x: np.array([x['X'], x['Y'], x['Z']]), axis=1)
+        dat['v_i'] = dat.apply(
+            lambda x: np.array([x['VX'], x['VY'], x['VZ']]), axis=1)
 
         dat_p_x['sum_mi_ri'] += mass * dat['r_i']
 
     dat_p_x['R'] = dat_p_x['sum_mi_ri'] * -1 * M_sun / M_px
     print(dat_p_x.head())
+
+    # Plot planetX location wrt time
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    x = dat_p_x['R'].apply(lambda i: i[0])
+    y = dat_p_x['R'].apply(lambda i: i[1])
+    z = dat_p_x['R'].apply(lambda i: i[2])
+    ax.plot(x, y, z)
+    plt.show()
 pass
