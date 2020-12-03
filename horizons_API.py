@@ -155,7 +155,7 @@ def download_obj_data(savedir, objid, start_time, stop_time,
 def get_obj_data(savedir, objid, overwrite=False):
     start_time = '2020-11-01-00-00-00'
     stop_time = '2020-12-01-00-00-00'
-    savename = os.path.join(savedir, objid + '.csv')
+    savename = os.path.join(savedir, str(objid) + '.csv')
     if not os.path.isfile(savename) or overwrite:
         download_obj_data(savedir, objid, start_time, stop_time,
                           overwrite=overwrite)

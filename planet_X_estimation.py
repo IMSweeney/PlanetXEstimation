@@ -9,13 +9,35 @@ import matplotlib.pyplot as plt
 import horizons_API as hapi
 
 
+def load_object_list_jpl():
+    df = pd.read_csv(r'data\jpl_tno_db.csv')
+    df['horizons'] = "DES=+" + df['spkid'].astype(str)
+
+    df = df.loc[(
+        (df['a'] > 150) &
+        ((0.75 < df['e']) & (df['e'] < 0.98)) &
+        ((3 < df['i']) & (df['i'] < 25)) &
+        ((200 < df['w']) & (df['w'] < 350))
+    )]
+    print('{} objects found'.format(len(df.index)))
+    # print(df['full_name'])
+
+    # TODO: Merge in mass/diameter data
+
+    return df.to_dict(orient='records')
+
+
 def load_object_list():
+    # r'data\jpl_tno_db.csv'
+    # df['horizons'] = "DES=+"+df['spkid'].astype(str)
+
     object_df = pd.read_csv(r'data\TNO_parameters.txt')
     outer_asteroids_df = pd.read_csv(r'data\any_outer_asteroids.csv')
 
     object_df['pdes'] = object_df['Object']
     outer_asteroids_df['pdes'] = outer_asteroids_df['pdes'].map(
         lambda x: x.replace(' ', '_'))
+
     object_df = object_df.merge(outer_asteroids_df, how='left', on='pdes')
     object_df = object_df[['Object', 'horizons', 'Mass(kg)']]
     print(object_df.head())
@@ -27,17 +49,15 @@ def load_object_list():
 if __name__ == '__main__':
     ##
     # Meta_data (masses)
-    objects = load_object_list()
+    objects = load_object_list_jpl()
     M_sun = 1.989e30  # kg
     M_px = 5.388e25  # kg
-
-    exit()
 
     ##
     # Location data (X, Y, Z from Sun)
     data_dir = r'data\horizons\etc'
     for obj in objects:
-        if obj['horizons'] != 'na':
+        if pd.notna(obj['horizons']):
             data = hapi.get_obj_data(data_dir, obj['horizons'])
             obj['data'] = data
 
@@ -56,7 +76,7 @@ if __name__ == '__main__':
         lambda x: np.array([0, 0, 0]), axis=1)
 
     for obj in objects:
-        obj_name = obj['Object']
+        obj_name = obj['full_name']
         mass = obj[r'Mass(kg)']
         if obj_name in ['Planet_X_(6)', 'Planet_X_(12)']:
             continue
