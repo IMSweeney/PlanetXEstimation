@@ -57,9 +57,7 @@ def read_ephemeris(location, name):
 if __name__ == '__main__':
     ##
     # Meta_data (masses)
-    df = pd.read_csv('TNO_parameters.txt')
-    df = df.rename(columns={
-        ' Mass(kg)': 'Mass(kg)', ' h(m*2/sec)': 'h(m*2/sec)'})
+    df = pd.read_csv(r'data\TNO_parameters.txt')
     masses = df.to_dict(orient='records')
     M_sun = 1.989e30  # kg
     M_px = 5.388e25  # kg
@@ -67,7 +65,7 @@ if __name__ == '__main__':
     ##
     # Location data (X, Y, Z from Sun)
     eph_data = {}
-    data_location = 'data'
+    data_location = r'data\horizons\downloads'
     for i, row in df.iterrows():
         obj_name = row['Object']
         if obj_name in ['Planet_X_(6)', 'Planet_X_(12)']:
