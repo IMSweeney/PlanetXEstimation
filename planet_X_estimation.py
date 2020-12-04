@@ -13,16 +13,19 @@ def load_object_list_jpl():
     df = pd.read_csv(r'data\jpl_tno_db.csv')
     df['horizons'] = "DES=+" + df['spkid'].astype(str)
 
-    df = df.loc[(
-        (df['a'] > 150) &
-        ((0.75 < df['e']) & (df['e'] < 0.98)) &
-        ((3 < df['i']) & (df['i'] < 25)) &
-        ((200 < df['w']) & (df['w'] < 350))
-    )]
-    print('{} objects found'.format(len(df.index)))
-    # print(df['full_name'])
+    # df = df.loc[(
+    #     (df['a'] > 150) &
+    #     ((0.75 < df['e']) & (df['e'] < 0.98)) &
+    #     ((3 < df['i']) & (df['i'] < 25)) &
+    #     ((200 < df['w']) & (df['w'] < 350))
+    # )]
 
     # TODO: Merge in mass/diameter data
+    masses = pd.read_csv(r'data\TNO_parameters.txt')
+    df = df.merge(masses, on='spkid', how='inner')
+
+    print('{} objects found'.format(len(df.index)))
+    print(df[['full_name', 'Mass(kg)', 'horizons']].head())
 
     return df.to_dict(orient='records')
 
@@ -46,7 +49,41 @@ def load_object_list():
     return object_list
 
 
-if __name__ == '__main__':
+def score_params(objects, params):
+    # params are the masses of each object (ateroids[0:n] + planet_x)
+    M_sun = 1.989e30  # kg
+    M_px = params[-1]
+
+    ##
+    # For each point in time, Calculate Planet_X location from EQ31:
+    # EQ31: m_p^2 * R_p = -M * sum(m_i * r_si)
+    # Where:
+    #   - m_p  is the mass of planet X
+    #   - R_p  is the Range vector of planet X
+    #   - M    is the mass of the Sun
+    #   - m_i  is the mass of the satelite, i
+    #   - r_si is the range vector of satelite i w.r.t the Sun
+
+    dat_p_x = objects[0]['data']['Calendar Date (TDB)'].to_frame()
+    dat_p_x['sum_mi_ri'] = dat_p_x.apply(
+        lambda x: np.array([0, 0, 0]), axis=1)
+
+    for i, obj in enumerate(objects):
+        dat = obj['data']
+        dat_p_x['sum_mi_ri'] += params[i] * dat['r_i']
+    dat_p_x['R'] = dat_p_x['sum_mi_ri'] * -1 * M_sun / M_px
+
+    ##
+    # Calculate the expected acceleration for each asteroid based on Px and Sun
+    # TODO: Do this part
+
+    ##
+    # Score the error in actual vs expected accel for each asteroid
+    # TODO: ...
+    pass
+
+
+def test():
     ##
     # Meta_data (masses)
     objects = load_object_list_jpl()
@@ -78,13 +115,14 @@ if __name__ == '__main__':
     for obj in objects:
         obj_name = obj['full_name']
         mass = obj[r'Mass(kg)']
-        if obj_name in ['Planet_X_(6)', 'Planet_X_(12)']:
-            continue
         dat = obj['data']
         dat['r_i'] = dat.apply(
             lambda x: np.array([x['X'], x['Y'], x['Z']]), axis=1)
         dat['v_i'] = dat.apply(
             lambda x: np.array([x['VX'], x['VY'], x['VZ']]), axis=1)
+
+        # Don't need to / time since units are au/d and points are 1d steps
+        dat['a_i'] = dat['v_i'].diff()
 
         dat_p_x['sum_mi_ri'] += mass * dat['r_i']
 
@@ -99,4 +137,7 @@ if __name__ == '__main__':
     z = dat_p_x['R'].apply(lambda i: i[2])
     ax.plot(x, y, z)
     plt.show()
-pass
+
+
+if __name__ == '__main__':
+    test()
