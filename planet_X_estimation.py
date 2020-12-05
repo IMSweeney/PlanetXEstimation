@@ -1,6 +1,7 @@
+import logging
+
 import pandas as pd
 import numpy as np
-
 import matplotlib.pyplot as plt
 import horizons_API as hapi
 
@@ -8,6 +9,26 @@ import genetic_solver as gen
 
 G = 6.6743015e-11  # [m^3] From wikipedia
 M_sun = 1.989e30  # [kg] From wikipedia
+
+
+def create_logger(name, level=logging.INFO, fh=None):
+    # create logger with 'spam_application'
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    if fh:
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler('out.log')
+        fh.setLevel(logging.DEBUG)
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+    # add the handlers to the logger
+    logger.addHandler(fh)
+    logger.addHandler(ch)
 
 
 def load_object_list_jpl():
@@ -54,14 +75,12 @@ def score_params(params, objects):
     # Score the error in actual vs expected accel for each asteroid
     dat_p_x = calculate_planet_x_position(objects, params, M_px)
 
+    # calculate_acceleration(objects, masses, dat_p_x, M_px)
+    calculate_acceleration_all_ast(objects, masses, dat_p_x, M_px)
+
     score = 0
     for i, obj in enumerate(objects):
         dat = obj['data']
-        dat['r_px'] = dat['r_i'] - dat_p_x['R']
-        dat['F_sun'] = (G * M_sun * params[i] / (dat['r_i']**2)).shift()
-        dat['F_px'] = (G * M_px * params[i] / (dat['r_px']**2)).shift()
-        dat['a_calc'] = dat['F_sun'] + dat['F_px'] / params[i]
-        # NOTE: mass of each asteroid seems to be irrelivant...
 
         dat['sq_err'] = (dat['a_i'] - dat['a_calc']) ** 2
         score += dat['sq_err'].apply(np.linalg.norm).sum()
@@ -88,6 +107,45 @@ def calculate_planet_x_position(objects, masses, M_px):
         dat_p_x['sum_mi_ri'] += masses[i] * dat['r_i']
     dat_p_x['R'] = dat_p_x['sum_mi_ri'] * -1 * M_sun / M_px
     return dat_p_x
+
+
+def calculate_acceleration(objects, masses, dat_p_x, M_px):
+    for i, obj in enumerate(objects):
+        dat = obj['data']
+        dat['r_px'] = dat['r_i'] - dat_p_x['R']
+        dat['F_sun'] = (G * M_sun * masses[i] / (dat['r_i']**2)).shift()
+        dat['F_px'] = (G * M_px * masses[i] / (dat['r_px']**2)).shift()
+        dat['a_calc'] = dat['F_sun'] + dat['F_px'] / masses[i]
+        # NOTE: mass of each asteroid seems to be irrelivant...
+
+
+def calculate_acceleration_all_ast(objects, masses, dat_p_x, M_px):
+    for i, obj in enumerate(objects):
+        dat = obj['data']
+
+        # Accel comp from sun and p_x
+        dat['r_px'] = dat['r_i'] - dat_p_x['R']
+        dat['a_sun'] = (G * M_sun / (dat['r_i']**2)).shift()
+        dat['a_px'] = (G * M_px / (dat['r_px']**2)).shift()
+        dat['a_calc'] = dat['a_sun'] + dat['a_px']
+        for j, obj2 in enumerate(objects):
+            dat2 = obj2['data']
+            if i == j:
+                dat['a_{}'.format(j)] = 0
+            else:
+                dat['a_{}'.format(j)] = (
+                    G * masses[j] / ((dat['r_i'] - dat2['r_i'])**2)).shift()
+            dat['a_calc'] = dat['a_calc'] + dat['a_{}'.format(j)]
+
+        dat['sun_contrib'] = dat.apply(
+            lambda x: np.divide(x['a_sun'], x['a_calc']), axis=1)
+        avg_sun_contrib = dat['sun_contrib'].mean()
+        print('sun contributes {} of accel'.format(avg_sun_contrib))
+
+        dat['px_contrib'] = dat.apply(
+            lambda x: np.divide(x['a_px'], x['a_calc']), axis=1)
+        avg_px_contrib = dat['px_contrib'].mean()
+        print('px contributes {} of accel'.format(avg_px_contrib))
 
 
 def plot_px_pos(dat_p_x):
@@ -123,10 +181,14 @@ if __name__ == '__main__':
     print('Initial score: {}'.format(score))
     print('Vec: {}'.format(masses))
 
-    # Genetic solver
-    solver = gen.GeneticSolver(masses, score_params, args=[objects],
-                               pop_size=100, num_iterations=1000)
+    # # Genetic solver
+    # solver = gen.GeneticSolver(masses, score_params, args=[objects],
+    #                            pop_size=100, num_iterations=1000)
 
-    best, score = solver.solve()
-    print('Best score: {}'.format(score))
-    print('Vec: {}'.format(best))
+    # best, score = solver.solve()
+    # print('Best score: {}'.format(score))
+    # print('Vec: {}'.format(best))
+
+    # Plot
+    dat_px = calculate_planet_x_position(objects, masses, M_px)
+    plot_px_pos(dat_px)
