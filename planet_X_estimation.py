@@ -4,9 +4,11 @@ import numpy as np
 import re
 
 import matplotlib.pyplot as plt
-
-
 import horizons_API as hapi
+
+import genetic_solver as gen
+
+G = 6.6743015e-11  # [m^3]
 
 
 def load_object_list_jpl():
@@ -49,7 +51,7 @@ def load_object_list():
     return object_list
 
 
-def score_params(objects, params):
+def score_params(params, objects):
     # params are the masses of each object (ateroids[0:n] + planet_x)
     M_sun = 1.989e30  # kg
     M_px = params[-1]
@@ -75,12 +77,20 @@ def score_params(objects, params):
 
     ##
     # Calculate the expected acceleration for each asteroid based on Px and Sun
-    # TODO: Do this part
-
-    ##
     # Score the error in actual vs expected accel for each asteroid
-    # TODO: ...
-    pass
+    score = 0
+    for i, obj in enumerate(objects):
+        dat = obj['data']
+        dat['r_px'] = dat['r_i'] - dat_p_x['R']
+        dat['F_sun'] = (G * M_sun * params[i] / (dat['r_i']**2)).shift()
+        dat['F_px'] = (G * M_px * params[i] / (dat['r_px']**2)).shift()
+        dat['a_calc'] = dat['F_sun'] + dat['F_px'] / params[i]
+        # NOTE: mass of each asteroid seems to be irrelivant...
+
+        dat['sq_err'] = (dat['a_i'] - dat['a_calc']) ** 2
+        score += dat['sq_err'].apply(np.linalg.norm).sum()
+
+    return score ** (1 / 2)
 
 
 def test():
@@ -140,4 +150,44 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    # test()
+
+    ##
+    # Meta_data (masses)
+    objects = load_object_list_jpl()
+    M_sun = 1.989e30  # kg
+    M_px = 5.388e25  # kg
+
+    ##
+    # Location data (X, Y, Z from Sun)
+    data_dir = r'data\horizons\etc'
+    for obj in objects:
+        if pd.notna(obj['horizons']):
+            data = hapi.get_obj_data(data_dir, obj['horizons'])
+            obj['data'] = data
+
+    # Process data into vectors/ generate accelerations
+    for obj in objects:
+        obj_name = obj['full_name']
+        mass = obj[r'Mass(kg)']
+        dat = obj['data']
+        dat['r_i'] = dat.apply(
+            lambda x: np.array([x['X'], x['Y'], x['Z']]), axis=1)
+        dat['v_i'] = dat.apply(
+            lambda x: np.array([x['VX'], x['VY'], x['VZ']]), axis=1)
+
+        # Don't need to / time since units are au/d and points are 1d steps
+        dat['a_i'] = dat['v_i'].diff()
+
+    masses = [obj['Mass(kg)'] for obj in objects] + [M_px]
+
+    score = score_params(masses, objects)
+    print('Initial score: {}'.format(score))
+    print('Vec: {}'.format(masses))
+
+    solver = gen.GeneticSolver(masses, score_params, args=[objects],
+                               pop_size=100, num_iterations=1000)
+
+    best, score = solver.solve()
+    print('Best score: {}'.format(score))
+    print('Vec: {}'.format(best))

@@ -4,10 +4,13 @@ import tqdm
 
 
 class GeneticSolver():
-    def __init__(self, x_i, score_fcn, num_iterations=1000, pop_size=1000,
+    def __init__(self, x_i, score_fcn, args=[], kwargs={},
+                 num_iterations=1000, pop_size=1000,
                  selection=0.1, mut_chance=0.1, seed=None):
         self.x_i = x_i
         self.score_fcn = score_fcn
+        self.fcn_args = args
+        self.fcn_kwargs = kwargs
         self.pop_size = pop_size
         self.selection_ = selection
         self.crossover_ = len(x_i) // 2
@@ -18,6 +21,7 @@ class GeneticSolver():
         self.num_iterations = num_iterations
 
         self.rand = random.Random(seed)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def solve(self):
         self.generate_population()
@@ -34,13 +38,14 @@ class GeneticSolver():
         return self.get_best_individual()
 
     def generate_population(self):
+
         self.pop = []
         for i in range(self.pop_size):
             self.pop.append(Individual(self.x_i))
 
     def score_population(self):
         for i in self.pop:
-            i.score = self.score_fcn(i.x)
+            i.score = self.score_fcn(i.x, *self.fcn_args, **self.fcn_kwargs)
 
     def selection(self):
         self.pop = sorted(self.pop, key=lambda i: i.score)
@@ -95,7 +100,8 @@ class Individual():
         self.score = None
 
 
-def test_score_fcn(x):
+def test_score_fcn(x, p, a=None):
+    # print(p, a)
     score = 0
     best = [10.1, 0.2, -12.5, 0, -0.00001]
     for i, val in enumerate(x):
@@ -105,7 +111,7 @@ def test_score_fcn(x):
 
 if __name__ == '__main__':
     x_i = [10, 0, 0, 0, 0]
-    gen = GeneticSolver(x_i, test_score_fcn)
+    gen = GeneticSolver(x_i, test_score_fcn, args=['a'], kwargs={'a': '3'})
     best, score = gen.solve()
     print('Best score: {}'.format(score))
     print('Vec: {}'.format(best))
