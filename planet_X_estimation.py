@@ -7,8 +7,14 @@ import horizons_API as hapi
 
 import genetic_solver as gen
 
-G = 6.6743015e-11  # [m^3] From wikipedia
+
+# Constants
 M_sun = 1.989e30  # [kg] From wikipedia
+G = 6.6743015e-11  # [m^3/kg-s^2] From wikipedia
+
+au_per_m = 6.6845871226706E-12  # [AU/m]
+s_per_d = 86400  # [s/d]
+G_au_d = G * (au_per_m ** 3) * (s_per_d ** 2)  # [au^3/kg-s^2]
 
 
 def create_logger(name, level=logging.INFO, fh=None):
@@ -42,6 +48,11 @@ def load_object_list_jpl():
     #     ((3 < df['i']) & (df['i'] < 25)) &
     #     ((200 < df['w']) & (df['w'] < 350))
     # )]
+
+    # print(len(df.index))
+    # print(len(df.dropna(subset=['diameter']).index))
+    # print(len(df.dropna(subset=['GM']).index))
+    # exit()
 
     # For now choose the 12 obj from paper and merge in phys data
     # Merge in mass/diameter data
@@ -109,12 +120,36 @@ def calculate_planet_x_position(objects, masses, M_px):
     return dat_p_x
 
 
+# UNFINISHED
+def calculate_planet_x_pos_w_orbits(objects, obrit, t_step):
+    # orbit = dict
+    #   period - 3375   [yrs]
+    #   a      - 225    [AU]
+    #   e      - 0.62   []
+    #   p      - 86     [AU]
+    #   l      - 19.5   [deg]
+    #   om     - 95.5   [deg]
+    #   w      - 153.5  [deg]
+    #
+    # {\displaystyle r=a\,{1-e^{2} \over 1+e\cos \nu }\,\!}
+    dat_p_x = objects[0]['data']['Calendar Date (TDB)'].to_frame()
+
+    dat_p_x['R'] = dat_p_x.apply(transform_to_cartesian, axis=1)
+
+    return dat_p_x
+
+
+# UNFINISHED
+def transform_to_cartesian(orbit, t_step):
+    pass
+
+
 def calculate_acceleration(objects, masses, dat_p_x, M_px):
     for i, obj in enumerate(objects):
         dat = obj['data']
         dat['r_px'] = dat['r_i'] - dat_p_x['R']
-        dat['F_sun'] = (G * M_sun * masses[i] / (dat['r_i']**2)).shift()
-        dat['F_px'] = (G * M_px * masses[i] / (dat['r_px']**2)).shift()
+        dat['F_sun'] = (G_au_d * M_sun * masses[i] / (dat['r_i']**2)).shift()
+        dat['F_px'] = (G_au_d * M_px * masses[i] / (dat['r_px']**2)).shift()
         dat['a_calc'] = dat['F_sun'] + dat['F_px'] / masses[i]
         # NOTE: mass of each asteroid seems to be irrelivant...
 
@@ -125,8 +160,8 @@ def calculate_acceleration_all_ast(objects, masses, dat_p_x, M_px):
 
         # Accel comp from sun and p_x
         dat['r_px'] = dat['r_i'] - dat_p_x['R']
-        dat['a_sun'] = (G * M_sun / (dat['r_i']**2)).shift()
-        dat['a_px'] = (G * M_px / (dat['r_px']**2)).shift()
+        dat['a_sun'] = (G_au_d * M_sun / (dat['r_i']**2)).shift()
+        dat['a_px'] = (G_au_d * M_px / (dat['r_px']**2)).shift()
         dat['a_calc'] = dat['a_sun'] + dat['a_px']
         for j, obj2 in enumerate(objects):
             dat2 = obj2['data']
@@ -134,18 +169,20 @@ def calculate_acceleration_all_ast(objects, masses, dat_p_x, M_px):
                 dat['a_{}'.format(j)] = 0
             else:
                 dat['a_{}'.format(j)] = (
-                    G * masses[j] / ((dat['r_i'] - dat2['r_i'])**2)).shift()
+                    G_au_d * masses[j] / ((dat['r_i'] - dat2['r_i'])**2)
+                ).shift()
             dat['a_calc'] = dat['a_calc'] + dat['a_{}'.format(j)]
 
-        dat['sun_contrib'] = dat.apply(
-            lambda x: np.divide(x['a_sun'], x['a_calc']), axis=1)
-        avg_sun_contrib = dat['sun_contrib'].mean()
-        print('sun contributes {} of accel'.format(avg_sun_contrib))
+        # Stats
+        # dat['sun_contrib'] = dat.apply(
+        #     lambda x: np.divide(x['a_sun'], x['a_calc']), axis=1)
+        # avg_sun_contrib = dat['sun_contrib'].mean()
+        # print('sun contributes {} of accel'.format(avg_sun_contrib))
 
-        dat['px_contrib'] = dat.apply(
-            lambda x: np.divide(x['a_px'], x['a_calc']), axis=1)
-        avg_px_contrib = dat['px_contrib'].mean()
-        print('px contributes {} of accel'.format(avg_px_contrib))
+        # dat['px_contrib'] = dat.apply(
+        #     lambda x: np.divide(x['a_px'], x['a_calc']), axis=1)
+        # avg_px_contrib = dat['px_contrib'].mean()
+        # print('px contributes {} of accel'.format(avg_px_contrib))
 
 
 def plot_px_pos(dat_p_x):
@@ -178,16 +215,16 @@ if __name__ == '__main__':
 
     # Initial score
     score = score_params(masses, objects)
-    print('Initial score: {}'.format(score))
+    print('Initial score: {} AU/d^2'.format(score))
     print('Vec: {}'.format(masses))
 
     # # Genetic solver
-    # solver = gen.GeneticSolver(masses, score_params, args=[objects],
-    #                            pop_size=100, num_iterations=1000)
+    solver = gen.GeneticSolver(masses, score_params, args=[objects],
+                               pop_size=100, num_iterations=100)
 
-    # best, score = solver.solve()
-    # print('Best score: {}'.format(score))
-    # print('Vec: {}'.format(best))
+    best, score = solver.solve()
+    print('Best score: {} AU/d^2'.format(score))
+    print('Vec: {}'.format(best))
 
     # Plot
     dat_px = calculate_planet_x_position(objects, masses, M_px)
