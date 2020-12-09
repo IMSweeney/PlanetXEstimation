@@ -1,11 +1,10 @@
-import logging
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import horizons_API as hapi
 
 import genetic_solver as gen
+import logginglite
 
 
 # Constants
@@ -17,24 +16,7 @@ s_per_d = 86400  # [s/d]
 G_au_d = G * (au_per_m ** 3) * (s_per_d ** 2)  # [au^3/kg-s^2]
 
 
-def create_logger(name, level=logging.INFO, fh=None):
-    # create logger with 'spam_application'
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    if fh:
-        # create file handler which logs even debug messages
-        fh = logging.FileHandler('out.log')
-        fh.setLevel(logging.DEBUG)
-    # create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    # create formatter and add it to the handlers
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
-    fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
-    # add the handlers to the logger
-    logger.addHandler(fh)
-    logger.addHandler(ch)
+logger = logginglite.create_logger(__name__, level='INFO')
 
 
 def load_object_list_jpl():
@@ -174,15 +156,21 @@ def calculate_acceleration_all_ast(objects, masses, dat_p_x, M_px):
             dat['a_calc'] = dat['a_calc'] + dat['a_{}'.format(j)]
 
         # Stats
-        # dat['sun_contrib'] = dat.apply(
-        #     lambda x: np.divide(x['a_sun'], x['a_calc']), axis=1)
-        # avg_sun_contrib = dat['sun_contrib'].mean()
-        # print('sun contributes {} of accel'.format(avg_sun_contrib))
+        dat['sun_contrib'] = dat.apply(
+            lambda x: np.divide(x['a_sun'], x['a_calc']), axis=1)
+        avg_sun_contrib = dat['sun_contrib'].mean()
+        print('sun contributes {} of accel'.format(avg_sun_contrib))
 
-        # dat['px_contrib'] = dat.apply(
-        #     lambda x: np.divide(x['a_px'], x['a_calc']), axis=1)
-        # avg_px_contrib = dat['px_contrib'].mean()
-        # print('px contributes {} of accel'.format(avg_px_contrib))
+        dat['px_contrib'] = dat.apply(
+            lambda x: np.divide(x['a_px'], x['a_calc']), axis=1)
+        avg_px_contrib = dat['px_contrib'].mean()
+        print('px contributes {} of accel'.format(avg_px_contrib))
+
+        for i, obj in enumerate(objects):
+            dat['ast_{}_contrib'.format(i)] = dat.apply(
+                lambda x: np.divide(x['a_{}'.format(i)], x['a_calc']), axis=1)
+            avg_px_contrib = dat['px_contrib'].mean()
+            print('asteroid {} contributes {} of accel'.format(i, avg_px_contrib))
 
 
 def plot_px_pos(dat_p_x):
@@ -218,13 +206,13 @@ if __name__ == '__main__':
     print('Initial score: {} AU/d^2'.format(score))
     print('Vec: {}'.format(masses))
 
-    # # Genetic solver
-    solver = gen.GeneticSolver(masses, score_params, args=[objects],
-                               pop_size=100, num_iterations=100)
+    # Genetic solver
+    # solver = gen.GeneticSolver(masses, score_params, args=[objects],
+    #                            pop_size=100, num_iterations=100)
 
-    best, score = solver.solve()
-    print('Best score: {} AU/d^2'.format(score))
-    print('Vec: {}'.format(best))
+    # best, score = solver.solve()
+    # print('Best score: {} AU/d^2'.format(score))
+    # print('Vec: {}'.format(best))
 
     # Plot
     dat_px = calculate_planet_x_position(objects, masses, M_px)

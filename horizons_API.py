@@ -7,7 +7,8 @@ import time
 import urllib.request
 import os.path
 
-import logging
+import logginglite
+log = logginglite.create_logger(__name__, level='WARNING')
 
 
 def get_link(objid, start_time, stop_time, stepsize, center):
@@ -32,16 +33,13 @@ def get_link(objid, start_time, stop_time, stepsize, center):
 
 
 def get_data(link, savename, objid):
-    values = {'name': 'Ian Sweeney',
-              'location': 'Portland, OR, USA',
-              'language': 'Python'}
-    headers = {'User-Agent': "PlanetX Search-Sim bot"}
-    data = urllib.parse.urlencode(values).encode('UTF-8')
-
-    if os.path.isfile(savename):
-        return
-
+    # values = {'name': 'Ian Sweeney',
+    #           'location': 'Portland, OR, USA',
+    #           'language': 'Python'}
+    # headers = {'User-Agent': "PlanetX Search-Sim bot"}
+    # data = urllib.parse.urlencode(values).encode('UTF-8')
     try:
+        log.info('link: {}'.format(link))
         output = urllib.request.urlopen(link)
         output = [x.decode('UTF-8') for x in output]
         output = [x.strip() for x in output]
@@ -50,18 +48,19 @@ def get_data(link, savename, objid):
             header = output[output.index('$$SOE') - 2].split(',')
             header = [x.lstrip() for x in header]
 
-            content = output[output.index('$$SOE') + 1: output.index('$$EOE') - 1]
+            content = output[
+                output.index('$$SOE') + 1: output.index('$$EOE') - 1]
             content = [x.split(',') for x in content]
 
             df = pd.DataFrame(content, columns=header)
             df.to_csv(savename, index=False)
         else:
-            print(objid, 'request successful but output not expected format')
-            print(link)
-            raise TypeError('Bad http formatt')
+            log.error('{}: request successful but output not expected format'.format(objid))
+            log.error(link)
+            raise TypeError('Bad http format')
     except:
-        print(objid, 'request unsuccessful')
-        print(link)
+        log.error(objid, 'request unsuccessful')
+        log.error(link)
         raise
 
 
@@ -144,22 +143,24 @@ def planets_example():
 
 def download_obj_data(savedir, objid, start_time, stop_time,
                       stepsize='1d', center='@sun', overwrite=False):
+    objid = str(objid)
     savename = os.path.join(savedir, objid + '.csv')
     link = get_link(objid, start_time, stop_time, stepsize, center)
     if os.path.isfile(savename) and not overwrite:
-        print('data file {} already exists'.format(savename))
+        log.info('data file {} already exists'.format(savename))
     else:
         get_data(link, savename, objid)
 
 
-def get_obj_data(savedir, objid, overwrite=False):
-    start_time = '2020-11-01-00-00-00'
-    stop_time = '2020-12-01-00-00-00'
+def get_obj_data(savedir, objid, overwrite=False,
+                 start_time='2000-01-01-00-00-00',
+                 stop_time='2030-01-01-00-00-00',
+                 stepsize='1y'):
     savename = os.path.join(savedir, str(objid) + '.csv')
     if not os.path.isfile(savename) or overwrite:
+        log.info('data not present or being overwritten')
         download_obj_data(savedir, objid, start_time, stop_time,
-                          overwrite=overwrite)
-
+                          overwrite=overwrite, stepsize=stepsize)
     return pd.read_csv(savename)
 
 
