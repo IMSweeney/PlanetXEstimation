@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import horizons_API as hapi
+from uncertainties import ufloat
 
+import horizons_API as hapi
 import genetic_solver as gen
 import logginglite
 
@@ -54,7 +55,7 @@ def score_params(params, objects):
 
 
 # UNFINISHED
-def calculate_planet_x_pos_w_orbits(objects, obrit, t_step):
+def calculate_planet_x_pos_w_orbits(objects, obrit, true_anamaly):
     # orbit = dict
     #   period - 3375   [yrs]
     #   a      - 225    [AU]
@@ -73,7 +74,7 @@ def calculate_planet_x_pos_w_orbits(objects, obrit, t_step):
 
 
 # UNFINISHED
-def transform_to_cartesian(orbit, t_step):
+def transform_to_cartesian(orbit, true_anamaly):
     pass
 
 
@@ -121,6 +122,14 @@ def calc_perturb_planets(target, objects):
     log.info('normalized error in perturbation is:\n{} AU/d^2'.format(
         ((data['a_perturb'] - data['a_per_planets']) / data['a_perturb'])
         .mean()))
+
+
+def calc_perturb_ast(target, objects):
+    pass
+
+
+def calc_perturb_px(target, px):
+    pass
 
 
 if __name__ == '__main__':
